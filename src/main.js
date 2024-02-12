@@ -1,82 +1,59 @@
-import iziToast from 'izitoast';
-import 'izitoast/dist/css/iziToast.min.css';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 
-const form = document.querySelector('.form');
-const gallery = document.querySelector('.gallery');
-const container = document.querySelector('div');
-const inputData = document.querySelector('input');
+import pixabayApi from './js/pixabay-api';
+import { renderGallery, getHtmlImageList } from './js/render-functions';
+import iziToast from 'izitoast';
+import 'izitoast/dist/css/iziToast.min.css';
 
-const showLoader = () => {
-  const loader = document.createElement('span');
-  loader.classList.add('loader');
-  container.append(loader);
-};
+const galleryList = document.querySelector('.gallery-list');
+const queryToSearch = document.querySelector('.search-form-input');
+const submitQuery = document.querySelector('.search-form');
+const loader = document.querySelector('.loader');
+const API_KEY = '42291404-11497e3de12ce0a674f69f05b';
 
-const hideLoader = () => {
-  const loader = document.querySelector('.loader');
-  if (loader) {
-    loader.remove();
-  }
-};
-
-form.addEventListener('submit', event => {
-  event.preventDefault();
-  const searchTerm = inputData.value;
-  showLoader();
-  gallery.innerHTML = '';
-  searchImages(searchTerm);
+const pixabay = new pixabayApi(API_KEY);
+const gallery = new SimpleLightbox('.gallery-list a', {
+  captionDelay: 250,
+  captionsData: 'alt',
 });
 
-function searchImages(searchTerm) {
-  const apiKey = '42291404-11497e3de12ce0a674f69f05b';
-  const url = `https://pixabay.com/api/?key=${apiKey}&q=${searchTerm}&image_type=photo&orientation=horizontal&safesearch=true`;
-  fetch(url)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(response.status);
-      } else {
-        return response.json();
-      }
-    })
-    .then(data => {
-      if (data.hits.length === 0) {
-        iziToast.error({
-          message:
-            'Sorry, there are no images matching <br>your search query. Please try again!</br>',
-          position: 'center',
-          transitionIn: 'fadeInLeft',
-        });
-        hideLoader();
-      } else {
-        const markup = data.hits
-          .map(data => {
-            return `
-            <li class="gallery-item"><a href="${data.largeImageURL}">
-          <img class="gallery-image" src="${data.webformatURL}" alt="${data.tags}"></a>
-          <p><b>Likes: </b>${data.likes}</p>
-          <p><b>Views: </b>${data.views}</p>
-          <p><b>Comments: </b>${data.comments}</p>
-          <p><b>Downloads: </b>${data.downloads}</p>
-          </li>`;
-          })
-          .join('');
+submitQuery.addEventListener('submit', e => {
+  e.preventDefault();
+  galleryList.innerHTML = '';
+  const query = queryToSearch.value;
+  if (isValidQuery(query)) {
+    isLoaderVisible(loader, true);
+    pixabay
+      .getImageList(query)
+      .then(imagesList => getHtmlImageList(imagesList.hits))
+      .then(htmlImageList => renderGallery(htmlImageList, galleryList))
+      .then(() => {
+        isLoaderVisible(loader, false);
+        gallery.refresh();
+      });
+  } else {
+    iziToast.error({
+      message: 'Search field is empty',
+      progressBar: false,
+      transitionIn: 'fadeIn',
+      position: 'topRight',
+    });
+  }
+});
 
-        gallery.insertAdjacentHTML('beforeend', markup);
-        const lightbox = new SimpleLightbox('.gallery a', {
-          captions: true,
-          captionType: 'attr',
-          captionsData: 'alt',
-          captionPosition: 'bottom',
-          fadeSpeed: 150,
-          captionSelector: 'img',
-          captionDelay: 250,
-        });
+function isValidQuery(queryToSearch) {
+  if (queryToSearch.trim() === '') {
+    return false;
+  } else {
+    return true;
+  }
+}
 
-        lightbox.on('show.simplelightbox').refresh();
-        hideLoader();
-      }
-    })
-    .catch(error => console.log(error));
+function isLoaderVisible(loader, isVisible = false) {
+  if (isVisible) {
+    loader.classList.remove('hidden');
+  } else {
+    loader.classList.add('hidden');
+  }
 }
